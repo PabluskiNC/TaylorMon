@@ -40,6 +40,7 @@ int hallsensor = 4;    //The pin location of the sensor
 // Connect to LCD via i2c, default address #0 (A0-A2 not jumpered)
 LiquidCrystal_I2C lcd(0x27,16,2);
 
+// These values are found in the secrets.h file
 //const char* ssid     = "";
 //const char* password = "";
 //const char* streamId   = "";
