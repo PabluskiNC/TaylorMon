@@ -1,7 +1,11 @@
 /*
- *  TaylorMon
- *  
- *  Monitors the water temperature, air temperature, water flow, and fan status of a Taylor Water Stove.
+ *  Program: TaylorMon
+ *
+ *  Author: Pablo Sanchez (www.pablo-sanchez.com)
+ *
+ *  Purpose:
+ *  The TaylorMon project was created to help manage a wood burning water stove.
+ *  It monitors the water temperature, air temperature, water flow, and fan status.
  *  The data is gathered and pushed to the sparkfun service.
  *  
  *  This sketch sends data via HTTP GET requests to data.sparkfun.com service.
@@ -12,16 +16,26 @@
  * Device Address: 288AB5000000802A Temp C: 25.50 Temp F: 77.90
  * Device Address: 283EB600000080BF Temp C: 29.50 Temp F: 85.10
  *
+ * This program was compiled, in part, from sample code and these sources:
+ *
+ * Pin usage:
+ * 0  - DAT on I2C bus for LCD
+ * 2  - SCL on I2C bus for LCD
+ * 4  - Flow Detector (hall effect)
+ * 5  - Dallas OneWire bus
+ * 16 - Fan on/off
+ * 
  */
 
 #include "secrets.h"
 #include <ESP8266WiFi.h>
 
-// One Wire
+// One Wire for the temp sensors
 #include <OneWire.h>
 #include <DallasTemperature.h>
+
 #define ONE_WIRE_BUS 5  // DS18B20 pin
-#define TEMPERATURE_PRECISION 9
+#define TEMPERATURE_PRECISION 9  // Bits of resolution (9 - 12)
 
 OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature. 
@@ -29,11 +43,11 @@ DallasTemperature sensors(&oneWire);
 // arrays to hold device addresses
 DeviceAddress insideThermometer, outsideThermometer;
 
-// include the library code:
+// LCD Display via I2C
 #include "Wire.h"
 #include "LiquidCrystal_I2C.h"
 
-volatile int NbTopsFan; //measuring the rising edges of the signal
+volatile int NbWaterflowPulses; //measuring the rising edges of the signal
 int flow;                               
 int hallsensor = 4;    //The pin location of the sensor
 
@@ -52,7 +66,7 @@ int wifi_good = 0;
 
 void rpm ()     //This is the function that the interupt calls 
 { 
-   NbTopsFan++;  //This function measures the rising and falling edge of the hall effect sensors signal
+   NbWaterflowPulses++;  //This function measures the rising and falling edge of the hall effect sensors signal
 } 
 
 void printAddress(DeviceAddress deviceAddress)
@@ -69,11 +83,9 @@ void printAddress(DeviceAddress deviceAddress)
 float FTemperature(DeviceAddress deviceAddress)
 {
   float tempC = sensors.getTempC(deviceAddress);
-  //Serial.print("Temp C: ");
-  //Serial.print(tempC);
-  //Serial.print(" Temp F: ");
   return(DallasTemperature::toFahrenheit(tempC));
 }
+
 // function to print the temperature for a device
 void printTemperature(DeviceAddress deviceAddress)
 {
@@ -108,7 +120,7 @@ void setup() {
 
   pinMode(16, INPUT);
   
-     // Initiate the i2c connection on esp pins 2 (DAT/SDA) and 14 (CLK/SCL)
+     // Initiate the i2c connection on esp pins 0 (DAT/SDA) and 2 (CLK/SCL)
   Wire.begin(0,2);
 
   // set up the LCD's number of columns and rows:
@@ -132,8 +144,8 @@ void setup() {
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  lcd.setCursor(0,1);
-  lcd.print("Connecting to ");
+  lcd.setCursor(0,0);
+  lcd.print("Connecting to: ");
   lcd.setCursor(0,1);
   lcd.print(ssid);
   
@@ -165,7 +177,7 @@ void setup() {
     lcd.print("WiFi UNconnected!");
   }
 
-  // Start up the library
+  // Let's find the temperature sensors
   sensors.begin();
 
   // locate devices on the bus
@@ -233,17 +245,16 @@ void setup() {
 
 int value = 0;
 
-
 void loop() {
   delay(10000);
   ++value;
 
    Serial.println("Reading flow...");
-  NbTopsFan = 0;   //Set NbTops to 0 ready for calculations
-  sei();      //Enables interrupts
-  delay (1000);   //Wait 1 second
-  cli();      //Disable interrupts
-  flow = (NbTopsFan * 60 / 5.5); //(Pulse frequency x 60) / 5.5Q, = flow rate 
+  NbWaterflowPulses = 0;   	//Set NbTops to 0 ready for calculations
+  sei();      		//Enables interrupts
+  delay (1000);   	//Wait 1 second
+  cli();      		//Disable interrupts
+  flow = (NbWaterflowPulses * 60 / 5.5); //(Pulse frequency x 60) / 5.5Q, = flow rate in Liters/Hour
   Serial.print("Flow is ");
   Serial.print(flow);
   Serial.println(" L/H");
@@ -325,6 +336,5 @@ void loop() {
   } else {
        Serial.println("WiFi not connected");
   }
-  
 
 }
